@@ -260,11 +260,18 @@ function sendMessage(content, type = 'text') {
     });
 }
 
+// Prevent multiple sends
+let isSending = false;
+
 // Send button click handler
 sendBtn.addEventListener('click', () => {
+    if (isSending) return;
     const message = messageInput.value.trim();
     if (message) {
-        sendMessage(message);
+        isSending = true;
+        sendMessage(message).finally(() => {
+            isSending = false;
+        });
         messageInput.value = '';
     }
 });
@@ -277,27 +284,71 @@ messageInput.addEventListener('keypress', (e) => {
     }
 });
 
+// Update sendMessage to return a Promise
+function sendMessage(content, type = 'text') {
+    const message = {
+        id: generateUUID(),
+        content,
+        type,
+        timestamp: Date.now()
+    };
+
+    return new Promise((resolve, reject) => {
+        channel.publish('message', message, (err) => {
+            if (err) {
+                console.error('Error sending message:', err);
+                reject(err);
+                return;
+            }
+
+            // Store in history
+            const history = JSON.parse(localStorage.getItem('messageHistory') || '[]');
+            history.push({
+                id: message.id,
+                clientId: user.username,
+                data: { type: message.type, content: message.content },
+                timestamp: message.timestamp
+            });
+            localStorage.setItem('messageHistory', JSON.stringify(history.slice(-100))); // Keep last 100 messages
+            resolve();
+        });
+    });
+}
+
+// UUID generator for message IDs
+function generateUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0,
+            v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
 // Image upload handler
 imageInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-        alert('Please select an image file');
+        alert('Please select a valid image file');
+        e.target.value = '';
         return;
     }
 
     if (file.size > 5 * 1024 * 1024) { // 5MB limit
         alert('Image size should be less than 5MB');
+        e.target.value = '';
         return;
     }
 
     try {
         const base64 = await convertToBase64(file);
         sendMessage(base64, 'image');
+        e.target.value = '';
     } catch (error) {
         console.error('Error processing image:', error);
         alert('Error uploading image. Please try again.');
+        e.target.value = '';
     }
 });
 
