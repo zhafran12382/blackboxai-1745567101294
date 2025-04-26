@@ -233,6 +233,35 @@ function loadMessageHistory() {
     const history = JSON.parse(localStorage.getItem('messageHistory') || '[]');
     history.forEach(message => addMessageToUI(message, true));
     messageContainer.scrollTop = messageContainer.scrollHeight;
+
+    // Add image click event delegation for preview
+    messageContainer.addEventListener('click', (e) => {
+        if (e.target.tagName === 'IMG' && e.target.closest('.message')) {
+            const modal = document.getElementById('imageModal');
+            const modalImage = document.getElementById('modalImage');
+            modalImage.src = e.target.src;
+            modal.classList.remove('hidden');
+        }
+    });
+
+    // Close modal button
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    closeModalBtn.addEventListener('click', () => {
+        const modal = document.getElementById('imageModal');
+        modal.classList.add('hidden');
+        const modalImage = document.getElementById('modalImage');
+        modalImage.src = '';
+    });
+
+    // Close modal on outside click
+    const modal = document.getElementById('imageModal');
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.classList.add('hidden');
+            const modalImage = document.getElementById('modalImage');
+            modalImage.src = '';
+        }
+    });
 }
 
 // Send message function
