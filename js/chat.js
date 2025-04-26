@@ -46,9 +46,25 @@ function addMessageToUI(message, isHistory = false) {
     }
 }
 
+// Request notification permission on load
+if ('Notification' in window) {
+    if (Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
+}
+
 // Subscribe to new messages
 channel.subscribe('message', (message) => {
     addMessageToUI(message);
+
+    // Show notification if window is not focused and message is not from self
+    if (document.hidden && message.clientId !== user.username && Notification.permission === 'granted') {
+        let notificationOptions = {
+            body: message.data.type === 'text' ? message.data.content : 'Sent an image',
+            icon: '/favicon.ico' // You can add a favicon or app icon here
+        };
+        new Notification(`New message from ${message.clientId}`, notificationOptions);
+    }
 });
 
 // Load message history from localStorage
