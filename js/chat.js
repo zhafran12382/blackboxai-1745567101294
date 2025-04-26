@@ -294,14 +294,134 @@ let isSending = false;
 
 // Send button click handler
 sendBtn.addEventListener('click', () => {
+    console.log('Send button clicked');
     if (isSending) return;
     const message = messageInput.value.trim();
     if (message) {
+        console.log('Sending message:', message);
         isSending = true;
         sendMessage(message).finally(() => {
             isSending = false;
         });
         messageInput.value = '';
+    }
+});
+
+// Enter key handler
+messageInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        console.log('Enter key pressed');
+        if (isSending) return;
+        const message = messageInput.value.trim();
+        if (message) {
+            console.log('Sending message:', message);
+            isSending = true;
+            sendMessage(message).finally(() => {
+                isSending = false;
+            });
+            messageInput.value = '';
+        }
+    }
+});
+
+let duplicateDeleteTimeouts = {};
+
+// Update sendMessage to return a Promise
+function sendMessage(content, type = 'text') {
+    console.log('sendMessage called with:', content);
+    const now = Date.now();
+
+    // Check for duplicate message sent within 0.5 to 1 second
+    if (
+        lastSentMessage.content === content &&
+        now - lastSentMessage.timestamp >= 500 &&
+        now - lastSentMessage.timestamp < 1000
+    ) {
+        console.log('Duplicate message detected, preventing send:', lastSentMessage.id);
+        // Prevent sending the second message
+        return Promise.reject('Duplicate message prevented');
+    }
+
+    const message = {
+        id: generateUUID(),
+        content,
+        type,
+        timestamp: now
+    };
+
+    lastSentMessage = {
+        content,
+        timestamp: now,
+        id: message.id
+    };
+
+    return new Promise((resolve, reject) => {
+        channel.publish('message', message, (err) => {
+            if (err) {
+                console.error('Error sending message:', err);
+                reject(err);
+                return;
+            }
+
+            // Store in history
+            const history = JSON.parse(localStorage.getItem('messageHistory') || '[]');
+            history.push({
+                id: message.id,
+                clientId: user.username,
+                data: { type: message.type, content: message.content },
+                timestamp: message.timestamp
+            });
+            localStorage.setItem('messageHistory', JSON.stringify(history.slice(-100))); // Keep last 100 messages
+
+            // Set timeout to delete duplicate message if sent within 0.5 seconds
+            if (
+                lastSentMessage.content === content &&
+                now - lastSentMessage.timestamp < 500
+            ) {
+                if (duplicateDeleteTimeouts[message.id]) {
+                    clearTimeout(duplicateDeleteTimeouts[message.id]);
+                }
+                duplicateDeleteTimeouts[message.id] = setTimeout(() => {
+                    const deleteMessage = {
+                        id: message.id,
+                        clientId: user.username,
+                        event: 'delete',
+                        timestamp: Date.now()
+                    };
+                    channel.publish('message', deleteMessage);
+                    removeLocalMessage(message.id);
+                    delete duplicateDeleteTimeouts[message.id];
+                }, 1000);
+            }
+
+            resolve();
+        });
+    });
+}
+
+// Modify subscription to handle edit and delete events
+channel.subscribe('message', (message) => {
+    console.log('Received message event:', message);
+    if (message.data.event === 'edit') {
+        // Find message div and update content
+        const msgDiv = document.querySelector(`[data-message-id="${message.id}"]`);
+        if (msgDiv) {
+            const p = msgDiv.querySelector('.message-text');
+            if (p) {
+                p.textContent = message.data.content;
+            }
+        }
+        updateLocalMessage(message);
+    } else if (message.data.event === 'delete') {
+        // Find message div and remove
+        const msgDiv = document.querySelector(`[data-message-id="${message.id}"]`);
+        if (msgDiv) {
+            msgDiv.remove();
+        }
+        removeLocalMessage(message.id);
+    } else {
+        addMessageToUI(message);
     }
 });
 
