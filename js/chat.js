@@ -20,7 +20,15 @@ const logoutBtn = document.getElementById('logoutBtn');
 const onlineCount = document.getElementById('onlineCount');
 
 // Message handling
+const displayedMessageIds = new Set();
+
 function addMessageToUI(message, isHistory = false) {
+    if (displayedMessageIds.has(message.id)) {
+        console.log('Duplicate message ignored in UI:', message.id);
+        return;
+    }
+    displayedMessageIds.add(message.id);
+
     const messageDiv = document.createElement('div');
     const isSent = message.clientId === user.username;
     
