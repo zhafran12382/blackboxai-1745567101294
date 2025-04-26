@@ -142,9 +142,35 @@ imageInput.addEventListener('change', async (e) => {
 
 // Logout handler
 logoutBtn.addEventListener('click', () => {
-    localStorage.removeItem('user');
-    window.location.href = 'index.html';
+    // Leave presence channel immediately
+    presence.leave(() => {
+        localStorage.removeItem('user');
+        window.location.href = 'index.html';
+    });
 });
+
+// Inactivity logout after 15 minutes of no activity
+let inactivityTimeout;
+const INACTIVITY_LIMIT = 15 * 60 * 1000; // 15 minutes
+
+function resetInactivityTimer() {
+    clearTimeout(inactivityTimeout);
+    inactivityTimeout = setTimeout(() => {
+        alert('You have been logged out due to inactivity.');
+        presence.leave(() => {
+            localStorage.removeItem('user');
+            window.location.href = 'index.html';
+        });
+    }, INACTIVITY_LIMIT);
+}
+
+// Reset timer on user interactions
+['mousemove', 'keydown', 'scroll', 'touchstart'].forEach(event => {
+    window.addEventListener(event, resetInactivityTimer);
+});
+
+// Start the timer initially
+resetInactivityTimer();
 
 // Utility functions
 function convertToBase64(file) {
