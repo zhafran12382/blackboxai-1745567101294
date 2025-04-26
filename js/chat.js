@@ -321,13 +321,46 @@ messageInput.addEventListener('keypress', (e) => {
     }
 });
 
+// Track last sent message to prevent duplicates
+let lastSentMessage = {
+    content: null,
+    timestamp: 0,
+    id: null
+};
+
 // Update sendMessage to return a Promise
 function sendMessage(content, type = 'text') {
+    const now = Date.now();
+
+    // Check for duplicate message sent within 1 second
+    if (
+        lastSentMessage.content === content &&
+        now - lastSentMessage.timestamp < 1000
+    ) {
+        // Send delete event for the duplicate message
+        if (lastSentMessage.id) {
+            const deleteMessage = {
+                id: lastSentMessage.id,
+                clientId: user.username,
+                event: 'delete',
+                timestamp: now
+            };
+            channel.publish('message', deleteMessage);
+            removeLocalMessage(lastSentMessage.id);
+        }
+    }
+
     const message = {
         id: generateUUID(),
         content,
         type,
-        timestamp: Date.now()
+        timestamp: now
+    };
+
+    lastSentMessage = {
+        content,
+        timestamp: now,
+        id: message.id
     };
 
     return new Promise((resolve, reject) => {
