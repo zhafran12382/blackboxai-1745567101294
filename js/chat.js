@@ -358,6 +358,10 @@ imageInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
+    const previewContainer = document.getElementById('imagePreviewContainer');
+    const previewImage = document.getElementById('imagePreview');
+    const clearBtn = document.getElementById('clearImagePreview');
+
     if (!file.type.startsWith('image/')) {
         alert('Please select a valid image file');
         e.target.value = '';
@@ -372,8 +376,33 @@ imageInput.addEventListener('change', async (e) => {
 
     try {
         const base64 = await convertToBase64(file);
-        sendMessage(base64, 'image');
-        e.target.value = '';
+        previewImage.src = base64;
+        previewContainer.classList.remove('hidden');
+
+        clearBtn.onclick = () => {
+            previewImage.src = '';
+            previewContainer.classList.add('hidden');
+            imageInput.value = '';
+        };
+
+        // Send image on send button click or enter key
+        sendBtn.onclick = () => {
+            if (previewImage.src) {
+                sendMessage(previewImage.src, 'image');
+                previewImage.src = '';
+                previewContainer.classList.add('hidden');
+                imageInput.value = '';
+                messageInput.value = '';
+            }
+        };
+
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey && previewImage.src) {
+                e.preventDefault();
+                sendBtn.click();
+            }
+        });
+
     } catch (error) {
         console.error('Error processing image:', error);
         alert('Error uploading image. Please try again.');
