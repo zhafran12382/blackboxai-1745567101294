@@ -309,7 +309,15 @@ sendBtn.addEventListener('click', () => {
 messageInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        sendBtn.click();
+        if (isSending) return;
+        const message = messageInput.value.trim();
+        if (message) {
+            isSending = true;
+            sendMessage(message).finally(() => {
+                isSending = false;
+            });
+            messageInput.value = '';
+        }
     }
 });
 
