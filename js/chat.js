@@ -61,7 +61,7 @@ channel.subscribe('message', (message) => {
     if (document.hidden && message.clientId !== user.username && Notification.permission === 'granted') {
         let notificationOptions = {
             body: message.data.type === 'text' ? message.data.content : 'Sent an image',
-            icon: '/favicon.ico' // You can add a favicon or app icon here
+            icon: 'https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg' // WhatsApp logo icon
         };
         new Notification(`New message from ${message.clientId}`, notificationOptions);
     }
