@@ -17,8 +17,20 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
         return;
     }
 
-    // Store user data
-    localStorage.setItem('user', JSON.stringify({ username }));
+    // Generate 5-character alphanumeric ID
+    function generateUserId() {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        let id = '';
+        for (let i = 0; i < 5; i++) {
+            id += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return id;
+    }
+
+    const userId = generateUserId();
+
+    // Store user data with ID
+    localStorage.setItem('user', JSON.stringify({ username, id: userId }));
 
     // Redirect to chat
     window.location.href = 'chat.html';
