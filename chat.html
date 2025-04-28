@@ -96,12 +96,12 @@
         <div class="flex items-center space-x-3">
             <i class="fab fa-whatsapp text-3xl"></i>
             <div>
-                <h1 class="font-semibold text-lg">Global Chat Room</h1>
-                <p class="text-sm opacity-90" id="onlineCount">Loading...</p>
+                <h1 class="font-semibold text-lg">WhatsApp NFBS - Global Chat Room</h1>
+                <p class="text-sm opacity-90" id="onlineCount">Memuat...</p>
             </div>
         </div>
         <button id="logoutBtn" class="px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg text-sm">
-            Logout
+            Keluar
         </button>
     </div>
 
@@ -114,11 +114,21 @@
     <div class="bg-white border-t p-4">
         <div class="flex items-center space-x-4">
             <label class="cursor-pointer">
-                <input type="file" id="imageInput" accept="image/*" class="hidden">
+                <input type="file" id="imageInput" accept="image/*" class="hidden" />
                 <i class="far fa-image text-gray-600 text-xl hover:text-[#128C7E]"></i>
             </label>
-            <input type="text" id="messageInput" placeholder="Type a message"
-                class="flex-1 px-4 py-2 border rounded-full focus:outline-none focus:border-[#128C7E]">
+            <button id="voiceBtn" title="Record Voice Message" class="text-gray-600 hover:text-[#128C7E] px-2">
+                <i class="fas fa-microphone text-xl"></i>
+            </button>
+            <button id="videoBtn" title="Record Video Message" class="text-gray-600 hover:text-[#128C7E] px-2">
+                <i class="fas fa-video text-xl"></i>
+            </button>
+            <input
+                type="text"
+                id="messageInput"
+                placeholder="Ketik pesan"
+                class="flex-1 px-4 py-2 border rounded-full focus:outline-none focus:border-[#128C7E]"
+            />
             <button id="sendBtn" class="bg-[#128C7E] text-white p-2 rounded-full hover:bg-[#0e6e5c]">
                 <i class="fas fa-paper-plane"></i>
             </button>
