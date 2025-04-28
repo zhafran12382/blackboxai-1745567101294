@@ -4,12 +4,16 @@ if (!user) {
     window.location.href = 'index.html';
 }
 
-// Initialize Ably
+// Initialize Ably with user ID as clientId
 const ably = new Ably.Realtime({
     key: config.ablyApiKey,
-    clientId: user.username
+    clientId: user.id
 });
 const channel = ably.channels.get('global-chat');
+
+const presence = channel.presence;
+// Enter presence with username and id
+presence.enter({ username: user.username, id: user.id });
 
 // DOM Elements
 const messageContainer = document.getElementById('messageContainer');
@@ -19,7 +23,134 @@ const imageInput = document.getElementById('imageInput');
 const logoutBtn = document.getElementById('logoutBtn');
 const onlineCount = document.getElementById('onlineCount');
 
-// Message handling
+const menuBtn = document.getElementById('menuBtn');
+const sidebarMenu = document.getElementById('sidebarMenu');
+const profileId = document.getElementById('profileId');
+const profileUsername = document.getElementById('profileUsername');
+const groupChatBtn = document.getElementById('groupChatBtn');
+const addUserBtn = document.getElementById('addUserBtn');
+const addUserSection = document.getElementById('addUserSection');
+const searchUserInput = document.getElementById('searchUserInput');
+const searchUserBtn = document.getElementById('searchUserBtn');
+const searchResults = document.getElementById('searchResults');
+
+let currentChannel = channel; // Start with group chat channel
+let currentChannelName = 'global-chat';
+
+// Show profile info
+profileId.textContent = `ID: ${user.id}`;
+profileUsername.textContent = `Username: ${user.username}`;
+
+// Menu toggle
+menuBtn.addEventListener('click', () => {
+    if (sidebarMenu.classList.contains('-translate-x-full')) {
+        sidebarMenu.classList.remove('-translate-x-full');
+    } else {
+        sidebarMenu.classList.add('-translate-x-full');
+    }
+});
+
+// Switch to group chat
+groupChatBtn.addEventListener('click', () => {
+    switchToChannel('global-chat');
+    sidebarMenu.classList.add('-translate-x-full');
+});
+
+// Show add user section
+addUserBtn.addEventListener('click', () => {
+    addUserSection.classList.toggle('hidden');
+});
+
+// Search user by ID or username
+searchUserBtn.addEventListener('click', () => {
+    const query = searchUserInput.value.trim().toLowerCase();
+    if (!query) {
+        searchResults.innerHTML = '<p class="text-gray-500">Masukkan ID atau nama pengguna untuk mencari.</p>';
+        return;
+    }
+    searchResults.innerHTML = '<p class="text-gray-500">Mencari...</p>';
+
+    // Get presence members and filter by ID or username
+    currentChannel.presence.get((err, members) => {
+        if (err) {
+            searchResults.innerHTML = '<p class="text-red-500">Terjadi kesalahan saat mencari.</p>';
+            return;
+        }
+        const results = members.filter(m => 
+            m.clientId.toLowerCase().includes(query) || 
+            (m.data && m.data.username && m.data.username.toLowerCase().includes(query))
+        );
+        if (results.length === 0) {
+            searchResults.innerHTML = '<p class="text-gray-500">Tidak ditemukan pengguna.</p>';
+            return;
+        }
+        searchResults.innerHTML = '';
+        results.forEach(m => {
+            const div = document.createElement('div');
+            div.className = 'p-2 border-b cursor-pointer hover:bg-gray-100';
+            div.textContent = `${m.data?.username || ''} (${m.clientId})`;
+            div.addEventListener('click', () => {
+                startPrivateChat(m.clientId, m.data?.username || '');
+                sidebarMenu.classList.add('-translate-x-full');
+                addUserSection.classList.add('hidden');
+                searchResults.innerHTML = '';
+                searchUserInput.value = '';
+            });
+            searchResults.appendChild(div);
+        });
+    });
+});
+
+// Switch to a channel (group or private)
+function switchToChannel(channelName) {
+    if (currentChannelName === channelName) return;
+
+    // Unsubscribe from current channel
+    currentChannel.unsubscribe();
+    currentChannel.presence.leave();
+
+    // Get new channel
+    currentChannel = ably.channels.get(channelName);
+    currentChannelName = channelName;
+
+    // Clear messages
+    messageContainer.innerHTML = '';
+    displayedMessageIds.clear();
+
+    // Subscribe to new channel messages
+    currentChannel.subscribe('message', (message) => {
+        addMessageToUI(message);
+    });
+
+    // Enter presence
+    currentChannel.presence.enter({ username: user.username, id: user.id });
+
+    // Update UI title
+    if (channelName === 'global-chat') {
+        document.getElementById('chatTitle').textContent = 'WhatsApp NFBS - Ruang Obrolan Global';
+        updateOnlineCount();
+    } else {
+        document.getElementById('chatTitle').textContent = `Chat dengan ${channelName}`;
+        onlineCount.textContent = '';
+    }
+}
+
+// Start private chat with userId and username
+function startPrivateChat(userId, username) {
+    const privateChannelName = `private-${[user.id, userId].sort().join('-')}`;
+    switchToChannel(privateChannelName);
+}
+
+// Update online count for group chat
+function updateOnlineCount() {
+    currentChannel.presence.get((err, members) => {
+        if (!err) {
+            onlineCount.textContent = `${members.length} online`;
+        }
+    });
+}
+
+// Track message IDs to prevent duplicates in UI
 const displayedMessageIds = new Set();
 
 function addMessageToUI(message, isHistory = false) {
@@ -30,7 +161,7 @@ function addMessageToUI(message, isHistory = false) {
     displayedMessageIds.add(message.id);
 
     const messageDiv = document.createElement('div');
-    const isSent = message.clientId === user.username;
+    const isSent = message.clientId === user.id;
     
     messageDiv.className = `message p-3 rounded-lg mb-2 ${isSent ? 'sent' : 'received'}`;
     messageDiv.dataset.messageId = message.id || message.timestamp; // unique id for message div
@@ -128,7 +259,7 @@ function finishEditingMessage(messageDiv, message, newText) {
     // Send edit event via Ably
     const editMessage = {
         id: message.id,
-        clientId: user.username,
+        clientId: user.id,
         data: {
             type: 'text',
             content: newText
@@ -158,7 +289,7 @@ function deleteMessage(messageDiv, message) {
     // Send delete event via Ably
     const deleteMessage = {
         id: message.id,
-        clientId: user.username,
+        clientId: user.id,
         event: 'delete',
         timestamp: Date.now()
     };
@@ -221,20 +352,6 @@ if ('Notification' in window) {
         Notification.requestPermission();
     }
 }
-
-// Subscribe to new messages
-channel.subscribe('message', (message) => {
-    addMessageToUI(message);
-
-    // Show notification if window is not focused and message is not from self
-    if (document.hidden && message.clientId !== user.username && Notification.permission === 'granted') {
-        let notificationOptions = {
-            body: message.data.type === 'text' ? message.data.content : 'Sent an image',
-            icon: 'https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg' // WhatsApp logo icon
-        };
-        new Notification(`New message from ${message.clientId}`, notificationOptions);
-    }
-});
 
 // Load message history from localStorage
 function loadMessageHistory() {
@@ -333,7 +450,12 @@ messageInput.addEventListener('keypress', (e) => {
     }
 });
 
-let duplicateDeleteTimeouts = {};
+// Track last sent message to prevent duplicates
+let lastSentMessage = {
+    content: null,
+    timestamp: 0,
+    id: null
+};
 
 // Update sendMessage to return a Promise
 function sendMessage(content, type = 'text') {
@@ -403,111 +525,6 @@ function sendMessage(content, type = 'text') {
                 }, 1000);
             }
 
-            resolve();
-        });
-    });
-}
-
-// Modify subscription to handle edit and delete events
-channel.subscribe('message', (message) => {
-    console.log('Received message event:', message);
-    if (message.data.event === 'edit') {
-        // Find message div and update content
-        const msgDiv = document.querySelector(`[data-message-id="${message.id}"]`);
-        if (msgDiv) {
-            const p = msgDiv.querySelector('.message-text');
-            if (p) {
-                p.textContent = message.data.content;
-            }
-        }
-        updateLocalMessage(message);
-    } else if (message.data.event === 'delete') {
-        // Find message div and remove
-        const msgDiv = document.querySelector(`[data-message-id="${message.id}"]`);
-        if (msgDiv) {
-            msgDiv.remove();
-        }
-        removeLocalMessage(message.id);
-    } else {
-        addMessageToUI(message);
-    }
-});
-
-// Enter key handler
-messageInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        if (isSending) return;
-        const message = messageInput.value.trim();
-        if (message) {
-            isSending = true;
-            sendMessage(message).finally(() => {
-                isSending = false;
-            });
-            messageInput.value = '';
-        }
-    }
-});
-
-// Track last sent message to prevent duplicates
-let lastSentMessage = {
-    content: null,
-    timestamp: 0,
-    id: null
-};
-
-// Update sendMessage to return a Promise
-function sendMessage(content, type = 'text') {
-    const now = Date.now();
-
-    // Check for duplicate message sent within 1 second
-    if (
-        lastSentMessage.content === content &&
-        now - lastSentMessage.timestamp < 1000
-    ) {
-        // Send delete event for the duplicate message
-        if (lastSentMessage.id) {
-            const deleteMessage = {
-                id: lastSentMessage.id,
-                clientId: user.username,
-                event: 'delete',
-                timestamp: now
-            };
-            channel.publish('message', deleteMessage);
-            removeLocalMessage(lastSentMessage.id);
-        }
-    }
-
-    const message = {
-        id: generateUUID(),
-        content,
-        type,
-        timestamp: now
-    };
-
-    lastSentMessage = {
-        content,
-        timestamp: now,
-        id: message.id
-    };
-
-    return new Promise((resolve, reject) => {
-        channel.publish('message', message, (err) => {
-            if (err) {
-                console.error('Error sending message:', err);
-                reject(err);
-                return;
-            }
-
-            // Store in history
-            const history = JSON.parse(localStorage.getItem('messageHistory') || '[]');
-            history.push({
-                id: message.id,
-                clientId: user.username,
-                data: { type: message.type, content: message.content },
-                timestamp: message.timestamp
-            });
-            localStorage.setItem('messageHistory', JSON.stringify(history.slice(-100))); // Keep last 100 messages
             resolve();
         });
     });
@@ -659,3 +676,4 @@ window.addEventListener('beforeunload', () => {
     presence.leave();
     ably.close();
 });
+</create_file>
