@@ -596,6 +596,76 @@ imageInput.addEventListener('change', async (e) => {
     }
 });
 
+// Audio and Video recording logic
+let mediaRecorder;
+let recordedChunks = [];
+let recordingType = null; // 'audio' or 'video'
+let currentStream = null;
+
+const voiceBtn = document.getElementById('voiceBtn');
+const videoBtn = document.getElementById('videoBtn');
+
+voiceBtn.addEventListener('click', async () => {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+        return;
+    }
+    recordingType = 'audio';
+    try {
+        if (currentStream) {
+            currentStream.getTracks().forEach(track => track.stop());
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        currentStream = stream;
+        startRecording(stream);
+    } catch (err) {
+        alert('Gagal mengakses mikrofon: ' + err.message);
+    }
+});
+
+videoBtn.addEventListener('click', async () => {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+        return;
+    }
+    recordingType = 'video';
+    try {
+        if (currentStream) {
+            currentStream.getTracks().forEach(track => track.stop());
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+        currentStream = stream;
+        startRecording(stream);
+    } catch (err) {
+        alert('Gagal mengakses kamera dan mikrofon: ' + err.message);
+    }
+});
+
+function startRecording(stream) {
+    recordedChunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+            recordedChunks.push(e.data);
+        }
+    };
+    mediaRecorder.onstop = () => {
+        const blob = new Blob(recordedChunks, { type: recordingType === 'audio' ? 'audio/webm' : 'video/webm' });
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            sendMessage(reader.result, recordingType);
+        };
+        reader.readAsDataURL(blob);
+        // Stop all tracks
+        if (currentStream) {
+            currentStream.getTracks().forEach(track => track.stop());
+            currentStream = null;
+        }
+    };
+    mediaRecorder.start();
+    alert(`Merekam ${recordingType}... Klik tombol lagi untuk berhenti.`);
+});
+
 // Logout handler
 logoutBtn.addEventListener('click', () => {
     // Leave presence channel immediately
